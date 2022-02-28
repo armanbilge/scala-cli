@@ -1,9 +1,11 @@
 package scala.cli
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import sun.misc.{Signal, SignalHandler}
 
 import java.io.{ByteArrayOutputStream, File, PrintStream}
 import java.nio.charset.StandardCharsets
+import java.security.Security
 
 import scala.build.internal.Constants
 import scala.cli.internal.Argv0
@@ -127,6 +129,8 @@ object ScalaCli {
     }
     val (systemProps, scalaCliArgs) = partitionArgs(remainingArgs)
     setSystemProps(systemProps)
+
+    Security.addProvider(new BouncyCastleProvider)
 
     // Getting killed by SIGPIPE quite often when on musl (in the "static" native
     // image), but also sometimes on glibc, or even on macOS, when we use domain

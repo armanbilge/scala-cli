@@ -6,6 +6,8 @@ import coursier.maven.MavenRepository
 import coursier.publish.checksum.logger.InteractiveChecksumLogger
 import coursier.publish.checksum.{ChecksumType, Checksums}
 import coursier.publish.fileset.{FileSet, Path}
+import coursier.publish.signing.logger.InteractiveSignerLogger
+import coursier.publish.signing.{GpgSigner, NopSigner, Signer}
 import coursier.publish.upload.logger.InteractiveUploadLogger
 import coursier.publish.upload.{FileUpload, HttpURLConnectionUpload}
 import coursier.publish.{Content, Pom}
@@ -20,10 +22,12 @@ import scala.build.EitherCps.{either, value}
 import scala.build.Ops._
 import scala.build.errors.{BuildException, CompositeBuildException, NoMainClassFoundError}
 import scala.build.internal.Util.ScalaDependencyOps
-import scala.build.options.Scope
+import scala.build.options.PublishOptions.{Signer => PSigner}
+import scala.build.options.{ConfigMonoid, Scope, Secret}
 import scala.build.{Build, Builds, Logger, Os}
 import scala.cli.CurrentParams
-import scala.cli.errors.{MissingRepositoryError, UploadError}
+import scala.cli.errors.{FailedToSignFileError, MissingRepositoryError, UploadError}
+import scala.cli.publish.BouncycastleSigner
 
 object Publish extends ScalaCommand[PublishOptions] {
 
@@ -250,18 +254,75 @@ object Publish extends ScalaCommand[PublishOptions] {
 
     val ec = builds.head.options.finalCache.ec
 
+    val signerOpt = ConfigMonoid.sum(
+      builds.map(_.options.notForBloopOptions.publishOptions.signer)
+    )
+    val signer: Signer = signerOpt match {
+      case Some(PSigner.Gpg) =>
+        val gpgSignatureIdOpt = ConfigMonoid.sum(
+          builds.map(_.options.notForBloopOptions.publishOptions.gpgSignatureId)
+        )
+        gpgSignatureIdOpt match {
+          case Some(gpgSignatureId) =>
+            val gpgOptions =
+              builds.toList.flatMap(_.options.notForBloopOptions.publishOptions.gpgOptions)
+            GpgSigner(
+              GpgSigner.Key.Id(gpgSignatureId),
+              extraOptions = gpgOptions
+            )
+          case None => NopSigner
+        }
+      case Some(PSigner.BouncyCastle) =>
+        val secretKeyOpt = ConfigMonoid.sum(
+          builds.map(_.options.notForBloopOptions.publishOptions.secretKey)
+        )
+        secretKeyOpt match {
+          case Some(secretKey) =>
+            val passwordOpt = ConfigMonoid.sum(
+              builds.map(_.options.notForBloopOptions.publishOptions.secretKeyPassword)
+            )
+            val privateKey = BouncycastleSigner.readSecretKey(os.read.inputStream(secretKey))
+            BouncycastleSigner(privateKey, passwordOpt.getOrElse(Secret("")))
+          case None => NopSigner
+        }
+      case None => NopSigner
+    }
+    val signerLogger =
+      new InteractiveSignerLogger(new OutputStreamWriter(System.err), verbosity = 1)
+    val signRes = signer.signatures(
+      fileSet0,
+      now,
+      ChecksumType.all.map(_.extension).toSet,
+      Set("maven-metadata.xml"),
+      signerLogger
+    )
+
+    val fileSet1 = value {
+      signRes
+        .left.map {
+          case (path, content, err) =>
+            val path0 = content.pathOpt
+              .map(os.Path(_, Os.pwd))
+              .toRight(path.repr)
+            new FailedToSignFileError(path0, err)
+        }
+        .map { signatures =>
+          fileSet0 ++ signatures
+        }
+    }
+
     val checksumLogger =
       new InteractiveChecksumLogger(new OutputStreamWriter(System.err), verbosity = 1)
     val checksums = Checksums(
       Seq(ChecksumType.MD5, ChecksumType.SHA1),
-      fileSet0,
+      fileSet1,
       now,
       ec,
       checksumLogger
     ).unsafeRun()(ec)
-    val fileSet1 = fileSet0 ++ checksums
+    val fileSet2 = fileSet1 ++ checksums
 
-    val finalFileSet = fileSet1.order(ec).unsafeRun()(ec)
+    val finalFileSet = fileSet2.order(ec).unsafeRun()(ec)
 
     val repoUrl = builds.head.options.notForBloopOptions.publishOptions.repository match {
       case None =>

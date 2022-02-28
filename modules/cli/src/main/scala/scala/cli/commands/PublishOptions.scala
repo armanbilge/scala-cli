@@ -4,9 +4,10 @@ import caseapp._
 
 import scala.build.EitherCps.{either, value}
 import scala.build.Ops._
-import scala.build.Positioned
 import scala.build.errors.{BuildException, CompositeBuildException}
 import scala.build.options.{BuildOptions, PublishOptions => BPublishOptions}
+import scala.build.{Os, Positioned}
+import scala.cli.internal.PasswordOption
 
 // format: off
 final case class PublishOptions(
@@ -71,7 +72,36 @@ final case class PublishOptions(
 
   @Group("Publishing")
   @HelpMessage("Whether to build and publish source JARs")
-    sources: Option[Boolean] = None
+    sources: Option[Boolean] = None,
+
+  @Group("Publishing")
+  @HelpMessage("ID of the GPG key to use to sign artifacts")
+  @ValueDescription("key-id")
+  @ExtraName("K")
+    gpgKey: Option[String] = None,
+
+  @Group("Publishing")
+  @HelpMessage("Secret key to use to sign artifacts with BouncyCastle")
+  @ValueDescription("path")
+    secretKey: Option[String] = None,
+
+  @Group("Publishing")
+  @HelpMessage("Password of secret key to use to sign artifacts with BouncyCastle")
+  @ValueDescription("value:…")
+  @ExtraName("secretKeyPass")
+    secretKeyPassword: Option[PasswordOption] = None,
+
+  @Group("Publishing")
+  @HelpMessage("Method to use to sign artifacts")
+  @ValueDescription("gpg|bc")
+    signer: Option[String] = None,
+
+  @Group("Publishing")
+  @HelpMessage("gpg command-line options")
+  @ValueDescription("argument")
+  @ExtraName("G")
+  @ExtraName("gpgOpt")
+    gpgOption: List[String] = Nil
 ) {
   // format: on
 
@@ -109,7 +139,17 @@ final case class PublishOptions(
           scalaVersionSuffix = scalaVersionSuffix.map(_.trim),
           scalaPlatformSuffix = scalaPlatformSuffix.map(_.trim),
           repository = publishRepository.filter(_.trim.nonEmpty),
-          sourceJar = sources
+          sourceJar = sources,
+          gpgSignatureId = gpgKey.map(_.trim).filter(_.nonEmpty),
+          gpgOptions = gpgOption,
+          secretKey = secretKey.filter(_.trim.nonEmpty).map(os.Path(_, Os.pwd)),
+          secretKeyPassword = secretKeyPassword.map(_.get()),
+          signer = value {
+            signer
+              .map(Positioned.commandLine(_))
+              .map(BPublishOptions.parseSigner(_))
+              .sequence
+          }
         )
       )
     )

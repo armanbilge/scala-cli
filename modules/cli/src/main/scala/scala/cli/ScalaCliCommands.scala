@@ -6,6 +6,7 @@ import caseapp.core.help.{Help, RuntimeCommandsHelp}
 import java.nio.file.InvalidPathException
 
 import scala.cli.commands._
+import scala.cli.commands.pgp.{PgpCreate, PgpVerify}
 
 class ScalaCliCommands(
   val progName: String,
@@ -31,6 +32,8 @@ class ScalaCliCommands(
     Metabrowse,
     Repl,
     Package,
+    PgpCreate,
+    PgpVerify,
     Publish,
     Run,
     SetupIde,

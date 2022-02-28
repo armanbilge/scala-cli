@@ -351,12 +351,14 @@ trait Cli extends SbtModule with CliLaunchers with ScalaCliPublishModule with Fo
   def repositories = super.repositories ++ customRepositories
 
   def ivyDeps = super.ivyDeps() ++ Agg(
+    Deps.bouncycastle,
     Deps.caseApp,
     Deps.coursierLauncher,
     Deps.coursierPublish,
     Deps.dataClass,
     Deps.jimfs, // scalaJsEnvNodeJs pulls jimfs:1.1, whose class path seems borked (bin compat issue with the guava version it depends on)
     Deps.jniUtils,
+    Deps.jsoniterScala,
     Deps.scalaJsLinker,
     Deps.scalaPackager,
     Deps.svmSubs,
@@ -364,6 +366,7 @@ trait Cli extends SbtModule with CliLaunchers with ScalaCliPublishModule with Fo
     Deps.metaconfigTypesafe
   )
   def compileIvyDeps = super.compileIvyDeps() ++ Agg(
+    Deps.jsoniterScalaMacros,
     Deps.svm
   )
   def mainClass = Some("scala.cli.ScalaCli")
@@ -394,14 +397,21 @@ trait CliIntegrationBase extends SbtModule with ScalaCliPublishModule with HasTe
     super.scalacOptions() ++ Seq("-Xasync", "-Ywarn-unused", "-deprecation")
   }
 
-  def sources = T.sources {
+  def modulesPath = T {
     val name                = mainArtifactName().stripPrefix(prefix)
     val baseIntegrationPath = os.Path(millSourcePath.toString.stripSuffix(name))
-    val modulesPath = os.Path(
+    val p = os.Path(
       baseIntegrationPath.toString.stripSuffix(baseIntegrationPath.baseName)
     )
-    val mainPath = PathRef(modulesPath / "integration" / "src" / "main" / "scala")
+    PathRef(p)
+  }
+  def sources = T.sources {
+    val mainPath = PathRef(modulesPath().path / "integration" / "src" / "main" / "scala")
     super.sources() ++ Seq(mainPath)
+  }
+  def resources = T.sources {
+    val mainPath = PathRef(modulesPath().path / "integration" / "src" / "main" / "resources")
+    super.resources() ++ Seq(mainPath)
   }
 
   def ivyDeps = super.ivyDeps() ++ Agg(
@@ -422,15 +432,23 @@ trait CliIntegrationBase extends SbtModule with ScalaCliPublishModule with HasTe
       "SCALA_CLI_TMP"  -> tmpDirBase().path.toString,
       "CI"             -> "1"
     )
+    private def updateRef(name: String, ref: PathRef): PathRef = {
+      val rawPath = ref.path.toString.replace(
+        File.separator + name + File.separator,
+        File.separator
+      )
+      PathRef(os.Path(rawPath))
+    }
     def sources = T.sources {
       val name = mainArtifactName().stripPrefix(prefix)
       super.sources().flatMap { ref =>
-        val rawPath = ref.path.toString.replace(
-          File.separator + name + File.separator,
-          File.separator
-        )
-        val base = PathRef(os.Path(rawPath))
-        Seq(base, ref)
+        Seq(updateRef(name, ref), ref)
+      }
+    }
+    def resources = T.sources {
+      val name = mainArtifactName().stripPrefix(prefix)
+      super.resources().flatMap { ref =>
+        Seq(updateRef(name, ref), ref)
       }
     }
 

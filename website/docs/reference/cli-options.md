@@ -363,6 +363,8 @@ Available in commands:
 - [`install-home`](./commands.md#install-home)
 - [`browse` / `metabrowse`](./commands.md#browse)
 - [`package`](./commands.md#package)
+- [`pgp create`](./commands.md#pgp-create)
+- [`pgp verify`](./commands.md#pgp-verify)
 - [`publish`](./commands.md#publish)
 - [`console` / `repl`](./commands.md#console)
 - [`run`](./commands.md#run)
@@ -804,6 +806,34 @@ The image repository
 
 The image tag; the default tag is `latest`
 
+## Pgp create options
+
+Available in commands:
+- [`pgp create`](./commands.md#pgp-create)
+
+
+<!-- Automatically generated, DO NOT EDIT MANUALLY -->
+
+#### `--email`
+
+#### `--password`
+
+#### `--dest`
+
+#### `--pub-dest`
+
+#### `--secret-dest`
+
+## Pgp verify options
+
+Available in commands:
+- [`pgp verify`](./commands.md#pgp-verify)
+
+
+<!-- Automatically generated, DO NOT EDIT MANUALLY -->
+
+#### `--key`
+
 ## Publish options
 
 Available in commands:
@@ -865,6 +895,32 @@ Repository to publish to
 #### `--sources`
 
 Whether to build and publish source JARs
+
+#### `--gpg-key`
+
+Aliases: `-K`
+
+ID of the GPG key to use to sign artifacts
+
+#### `--secret-key`
+
+Secret key to use to sign artifacts with BouncyCastle
+
+#### `--secret-key-password`
+
+Aliases: `--secret-key-pass`
+
+Password of secret key to use to sign artifacts with BouncyCastle
+
+#### `--signer`
+
+Method to use to sign artifacts
+
+#### `--gpg-option`
+
+Aliases: `-G`, `--gpg-opt`
+
+gpg command-line options
 
 ## Repl options
 

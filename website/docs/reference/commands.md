@@ -400,3 +400,17 @@ Accepts options:
 - [verbosity](./cli-options.md#verbosity-options)
 - [workspace](./cli-options.md#workspace-options)
 
+### `pgp create`
+
+Create PGP key pair
+
+Accepts options:
+- [pgp create](./cli-options.md#pgp-create-options)
+
+### `pgp verify`
+
+Verify PGP signatures
+
+Accepts options:
+- [pgp verify](./cli-options.md#pgp-verify-options)
+
